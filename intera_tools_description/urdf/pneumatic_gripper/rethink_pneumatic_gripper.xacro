@@ -3,6 +3,25 @@
   <xacro:macro name="rethink_pneumatic_gripper" params="side">
 
     <xacro:property name="tip_length" value="${0.06 + 0.02}" scope="local"/>
+    <!-- Connector Plate Joint -->
+    <xacro:property name="end_of_arm_offset" value="-0.005" scope="local"/>
+    <joint name="${side}_connector_plate_base_joint" type="fixed">
+      <origin rpy="0 0 0" xyz="0 0 ${end_of_arm_offset}" />
+      <parent link="${side}_hand"  />
+      <child  link="${side}_connector_plate_base" />
+    </joint>
+    <!-- Connector Plate Link -->
+    <xacro:include filename="$(find intera_tools_description)/urdf/connector_plate/connector_plate.xacro" />
+    <xacro:rethink_connector_plate side="${side}" gazebo="${gazebo}"/>
+    <xacro:property name="electric_gripper_parent_link" value="${side}_connector_plate_mount" scope="local"/>
+    <xacro:property name="connector_plate_length" value="${rethink_connector_plate_length}" scope="local"/>
+
+    <!-- Pneumatic Gripper Base Joint -->
+    <joint name="${side}_gripper_base" type="fixed">
+      <origin rpy="0 0 ${pi}" xyz="0 0 0.0"/>
+      <parent link="${side}_connector_plate_mount"/>
+      <child link="${side}_gripper_base"/>
+    </joint>
 
     <!-- Base of end effector -->
     <link name="${side}_gripper_base">
@@ -28,12 +47,6 @@
       </inertial>
     </link>
 
-    <!-- Pneumatic Gripper Base Joint -->
-    <joint name="${side}_gripper_base" type="fixed">
-      <origin rpy="0 0 0" xyz="0 0 0.0"/>
-      <parent link="${side}_hand"/>
-      <child link="${side}_gripper_base"/>
-    </joint>
     <!-- Pneumatic Gripper Tip joint -->
     <joint name="${side}_endpoint" type="fixed">
       <origin rpy="0 0 0" xyz="0 0 ${tip_length}"/>
