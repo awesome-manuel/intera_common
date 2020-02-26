@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rethink_pneumatic_gripper">
-  <xacro:macro name="rethink_pneumatic_gripper" params="side">
+  <xacro:macro name="rethink_pneumatic_gripper" params="side gazebo">
 
-    <xacro:property name="tip_length" value="${0.06 + 0.02}" scope="local"/>
+    <xacro:property name="tip_length" value="${0.077}" scope="local"/>
+
     <!-- Connector Plate Joint -->
     <xacro:property name="end_of_arm_offset" value="-0.005" scope="local"/>
     <joint name="${side}_connector_plate_base_joint" type="fixed">
@@ -13,8 +14,6 @@
     <!-- Connector Plate Link -->
     <xacro:include filename="$(find intera_tools_description)/urdf/connector_plate/connector_plate.xacro" />
     <xacro:rethink_connector_plate side="${side}" gazebo="${gazebo}"/>
-    <xacro:property name="electric_gripper_parent_link" value="${side}_connector_plate_mount" scope="local"/>
-    <xacro:property name="connector_plate_length" value="${rethink_connector_plate_length}" scope="local"/>
 
     <!-- Pneumatic Gripper Base Joint -->
     <joint name="${side}_gripper_base" type="fixed">
@@ -32,13 +31,10 @@
         </geometry>
       </visual>
       <collision>
-        <origin rpy="0 ${pi} ${pi}" xyz="0.0 0.0 0.04"/>
+        <origin rpy="0 ${pi} ${pi}" xyz="0 0 ${tip_length / 2}"/>
         <geometry>
-          <cylinder length="0.08" radius="0.02"/>
+          <cylinder length="${tip_length}" radius="0.02"/>
         </geometry>
-        <material name="darkred">
-          <color rgba=".5 .1 .1 1"/>
-        </material>
       </collision>
       <inertial>
         <origin rpy="0 ${pi} ${pi}" xyz="0.0 0.0 0.0"/>
@@ -51,16 +47,74 @@
     <joint name="${side}_endpoint" type="fixed">
       <origin rpy="0 0 0" xyz="0 0 ${tip_length}"/>
       <parent link="${side}_gripper_base"/>
-      <child link="${side}_gripper"/>
+      <child link="${side}_gripper_tip"/>
     </joint>
+
     <!-- Pneumatic Gripper Tip link -->
-    <link name="${side}_gripper">
+    <link name="${side}_gripper_tip">
       <inertial>
         <origin rpy="0 0 0" xyz="0 0 0"/>
         <mass value="0.0001"/>
         <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0.0"/>
       </inertial>
     </link>
+
+    <joint name="${side}_vacuum_joint" type="revolute">
+      <parent link="${side}_gripper_tip" />
+      <child link="${side}_vacuum_gripper" />
+      <origin rpy="0 0 0" xyz="0 0 0.015" />
+      <limit effort="50" velocity="0.1" lower="0" upper="0" />
+    </joint>
+
+    <link name="${side}_vacuum_gripper">
+      <gravity>0</gravity>
+      <!--visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.005" length="0.001"/>
+        </geometry>
+        <material name="transparent">
+          <color rgba="0 0 0 0"/>
+        </material>
+      </visual-->
+      <inertial>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <mass value="0.0001"/>
+        <inertia ixx="1e-08" ixy="0" ixz="0" iyy="1e-08" iyz="0" izz="1e-08"/>
+      </inertial>
+    </link>
+
+    <xacro:if value="${gazebo}">
+      <transmission name="${side}_gripper">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${side}_vacuum_joint">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="${side}_gripper_motor">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission>
+
+      <gazebo reference="${side}_vacuum_joint">
+        <implicitSpringDamper>0</implicitSpringDamper>
+        <provideFeedback>false</provideFeedback>
+      </gazebo>
+
+      <gazebo reference="${side}_gripper_base">
+        <kp value="1e8"/>
+        <kd value="1.0"/>
+      </gazebo>
+
+      <gazebo>
+      <!-- http://docs.ros.org/kinetic/api/gazebo_plugins/html/group__GazeboRosVacuumGripper.html -->
+      <plugin name="gazebo_ros_vacuum_gripper" filename="libgazebo_ros_vacuum_gripper.so">
+        <robotNamespace>/robot/vacuum_gripper</robotNamespace>
+        <bodyName>${side}_vacuum_gripper</bodyName>
+        <topicName>grasping</topicName>
+      </plugin>
+      </gazebo>
+    </xacro:if>
 
   </xacro:macro>
 </robot>
